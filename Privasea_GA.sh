@@ -95,5 +95,31 @@ echo "🔐 Generating new keystore..."
 sudo docker run -it -v "/privasea/config:/app/config" privasea/acceleration-node-beta:latest ./node-calc new_keystore
 check_status "Keystore generation"
 
+# Rename the keystore file in the /privasea/config folder to wallet_keystore
+echo "📝 Checking for a keystore file starting with 'UTC--' to rename it to 'wallet_keystore'..."
+
+# Navigate to the configuration directory
+cd /privasea/config
+
+# Find the file that starts with "UTC--" (handles unique file names)
+keystore_file=$(ls | grep "^UTC--")
+
+if [ -z "$keystore_file" ]; then
+    echo "❌ Error: No keystore file found in /privasea/config. Exiting."
+    exit 1
+fi
+
+# Rename the keystore file to wallet_keystore
+echo "🔄 Renaming '$keystore_file' to 'wallet_keystore'..."
+mv "$keystore_file" "wallet_keystore"
+
+# Verify the rename was successful
+if [ -f "wallet_keystore" ]; then
+    echo "✅ The keystore file has been successfully renamed to 'wallet_keystore'."
+else
+    echo "❌ Error: Failed to rename the keystore file. Exiting."
+    exit 1
+fi
+
 echo "✅ Setup completed successfully!"
 echo "Please note down your node address and keystore password for future reference."
