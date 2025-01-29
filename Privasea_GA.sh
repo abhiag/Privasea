@@ -16,7 +16,7 @@ printf "\n\n"
 
 ##########################################################################################
 #                                                                                        
-#                🚀 THIS SCRIPT IS PROUDLY CREATED BY **GA CRYPTO**! 🚀                  
+#                🚀 THIS SCRIPT IS PROUDLY CREATED BY **GA CRYPTO**! 🚀                 
 #                                                                                        
 #   🌐 Join our revolution in decentralized networks and crypto innovation!               
 #                                                                                        
@@ -39,65 +39,74 @@ printf "${RESET}"
 
 # Privanetix Node Setup Script
 
-# Function to retry a command multiple times until success
-retry_command() {
-    local command="$1"
-    local retries=5
-    local delay=10
-    local count=0
-
-    until $command; do
-        count=$((count + 1))
-        if [ $count -ge $retries ]; then
-            echo "❌ Error: Command failed after $retries attempts. Exiting."
-            exit 1
-        fi
-        echo "⏳ Retrying ($count/$retries)..."
-        sleep $delay
-    done
+# Function to check the exit status of the last executed command
+check_status() {
+    if [ $? -ne 0 ]; then
+        echo "❌ Error: $1 failed. Exiting."
+        exit 1
+    fi
 }
 
 # Update and install necessary dependencies
 echo "🔄 Updating package list and installing dependencies..."
-retry_command "sudo apt update && sudo apt install -y apt-transport-https ca-certificates curl software-properties-common"
+sudo apt update && sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
+check_status "Package installation"
 
 # Add Docker's official GPG key
 echo "🔑 Adding Docker's GPG key..."
-retry_command "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -"
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+check_status "Adding Docker GPG key"
 
 # Add Docker's official repository
 echo "📦 Adding Docker repository..."
-retry_command "sudo add-apt-repository 'deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable'"
+sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+check_status "Adding Docker repository"
 
 # Update package list again
 echo "🔄 Updating package list..."
-retry_command "sudo apt update"
+sudo apt update
+check_status "Package list update"
 
 # Install Docker
 echo "🐳 Installing Docker..."
-retry_command "sudo apt install -y docker-ce"
+sudo apt install -y docker-ce
+check_status "Docker installation"
 
 # Start and enable Docker service
 echo "🚀 Starting and enabling Docker service..."
-retry_command "sudo systemctl start docker && sudo systemctl enable docker"
+sudo systemctl start docker
+sudo systemctl enable docker
+check_status "Starting Docker service"
 
 # Function to restart Docker and retry pulling the image
 pull_docker_image() {
     # Try pulling the Docker image
     echo "📥 Pulling Privanetix Node Docker image..."
-    retry_command "sudo docker pull privasea/acceleration-node-beta"
+    sudo docker pull privasea/acceleration-node-beta
+    if [ $? -ne 0 ]; then
+        echo "❌ Error: Pulling Docker image failed. Restarting Docker and retrying..."
+        # Restart Docker service
+        sudo systemctl daemon-reload
+        sudo systemctl restart docker
+        check_status "Restarting Docker service"
+        # Retry pulling the image after restarting Docker
+        echo "🔄 Retrying Docker image pull..."
+        sudo docker pull privasea/acceleration-node-beta
+        check_status "Retrying Docker image pull"
+    fi
 }
-
-# Pull Docker image
-pull_docker_image
 
 # Create the program running directory
 echo "📂 Creating program directory..."
-retry_command "sudo mkdir -p /privasea/config && sudo chown -R $USER:$USER /privasea"
+sudo mkdir -p /privasea/config
+sudo chown -R $USER:$USER /privasea
+cd /privasea
+check_status "Creating program directory"
 
 # Generate a new keystore
 echo "🔐 Generating new keystore..."
-retry_command "sudo docker run -it -v \"/privasea/config:/app/config\" privasea/acceleration-node-beta:latest ./node-calc new_keystore"
+sudo docker run -it -v "/privasea/config:/app/config" privasea/acceleration-node-beta:latest ./node-calc new_keystore
+check_status "Keystore generation"
 
 # Rename the keystore file in the /privasea/config folder to wallet_keystore
 echo "📝 Checking for a keystore file starting with 'UTC--' to rename it to 'wallet_keystore'..."
@@ -115,7 +124,7 @@ fi
 
 # Rename the keystore file to wallet_keystore
 echo "🔄 Renaming '$keystore_file' to 'wallet_keystore'..."
-retry_command "mv \"$keystore_file\" \"wallet_keystore\""
+mv "$keystore_file" "wallet_keystore"
 
 # Verify the rename was successful
 if [ -f "wallet_keystore" ]; then
@@ -127,3 +136,4 @@ fi
 
 echo "✅ Setup completed successfully!"
 echo "Please note down your node address and keystore password for future reference."
+
