@@ -78,10 +78,23 @@ sudo systemctl start docker
 sudo systemctl enable docker
 check_status "Starting Docker service"
 
-# Pull the Privanetix Node Docker image
-echo "📥 Pulling Privanetix Node Docker image..."
-sudo docker pull privasea/acceleration-node-beta
-check_status "Pulling Docker image"
+# Function to restart Docker and retry pulling the image
+pull_docker_image() {
+    # Try pulling the Docker image
+    echo "📥 Pulling Privanetix Node Docker image..."
+    sudo docker pull privasea/acceleration-node-beta
+    if [ $? -ne 0 ]; then
+        echo "❌ Error: Pulling Docker image failed. Restarting Docker and retrying..."
+        # Restart Docker service
+        sudo systemctl daemon-reload
+        sudo systemctl restart docker
+        check_status "Restarting Docker service"
+        # Retry pulling the image after restarting Docker
+        echo "🔄 Retrying Docker image pull..."
+        sudo docker pull privasea/acceleration-node-beta
+        check_status "Retrying Docker image pull"
+    fi
+}
 
 # Create the program running directory
 echo "📂 Creating program directory..."
