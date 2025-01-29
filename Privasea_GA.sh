@@ -41,64 +41,79 @@ EOF
 
     # Privanetix Node Setup Script
 
-    # Function to check the exit status of the last executed command
-    check_status() {
-        if [ $? -ne 0 ]; then
-            echo "❌ Error: $1 failed. Retrying the entire setup..."
-            return 1
-        fi
-    }
-
     # Update and install necessary dependencies
     echo "🔄 Updating package list and installing dependencies..."
     sudo apt update && sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
-    check_status "Package installation" || continue
+    if [ $? -ne 0 ]; then
+        echo "❌ Error: Package installation failed. Retrying..."
+        continue
+    fi
 
-    # Add Docker's official GPG key
-    echo "🔑 Adding Docker's GPG key..."
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-    check_status "Adding Docker GPG key" || continue
+    # Add Docker's official GPG key using gpg and store it in the trusted keyring directory
+echo "🔑 Adding Docker's GPG key..."
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/trusted.gpg.d/docker-archive.gpg
+if [ $? -ne 0 ]; then
+    echo "❌ Error: Adding Docker GPG key failed. Retrying..."
+    continue
+fi
 
     # Add Docker's official repository
     echo "📦 Adding Docker repository..."
     sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-    check_status "Adding Docker repository" || continue
+    if [ $? -ne 0 ]; then
+        echo "❌ Error: Adding Docker repository failed. Retrying..."
+        continue
+    fi
 
     # Update package list again
     echo "🔄 Updating package list..."
     sudo apt update
-    check_status "Package list update" || continue
+    if [ $? -ne 0 ]; then
+        echo "❌ Error: Package list update failed. Retrying..."
+        continue
+    fi
 
     # Install Docker
     echo "🐳 Installing Docker..."
     sudo apt install -y docker-ce
-    check_status "Docker installation" || continue
+    if [ $? -ne 0 ]; then
+        echo "❌ Error: Docker installation failed. Retrying..."
+        continue
+    fi
 
     # Start and enable Docker service
     echo "🚀 Starting and enabling Docker service..."
     sudo systemctl start docker
     sudo systemctl enable docker
-    check_status "Starting Docker service" || continue
+    if [ $? -ne 0 ]; then
+        echo "❌ Error: Starting Docker service failed. Retrying..."
+        continue
+    fi
 
-    # Function to restart Docker and retry pulling the image
+    # Function to restart Docker and retry pulling the image until it works
     pull_docker_image() {
-        # Try pulling the Docker image
-        echo "📥 Pulling Privanetix Node Docker image..."
-        sudo docker pull privasea/acceleration-node-beta
-        if [ $? -ne 0 ]; then
-            echo "❌ Error: Pulling Docker image failed. Restarting Docker and retrying..."
-            # Restart Docker service
-            sudo systemctl daemon-reload
-            sudo systemctl restart docker
-            check_status "Restarting Docker service" || return 1
-            # Retry pulling the image after restarting Docker
-            echo "🔄 Retrying Docker image pull..."
+        while true; do
+            # Try pulling the Docker image
+            echo "📥 Pulling Privanetix Node Docker image..."
             sudo docker pull privasea/acceleration-node-beta
-            check_status "Retrying Docker image pull" || return 1
-        fi
+            if [ $? -eq 0 ]; then
+                echo "✅ Docker image pulled successfully."
+                break # Exit the loop if the image is pulled successfully
+            else
+                echo "❌ Error: Pulling Docker image failed. Retrying..."
+                # Restart Docker service and try again if pulling fails
+                sudo systemctl daemon-reload
+                sudo systemctl restart docker
+                if [ $? -ne 0 ]; then
+                    echo "❌ Error: Restarting Docker service failed. Retrying..."
+                    continue
+                fi
+                echo "🔄 Retrying Docker image pull..."
+            fi
+        done
     }
 
-    # Pull Docker image
+    # Pull Docker image (retry until success)
     pull_docker_image || continue
 
     # Create the program running directory
@@ -106,12 +121,18 @@ EOF
     sudo mkdir -p /privasea/config
     sudo chown -R $USER:$USER /privasea
     cd /privasea
-    check_status "Creating program directory" || continue
+    if [ $? -ne 0 ]; then
+        echo "❌ Error: Creating program directory failed. Retrying..."
+        continue
+    fi
 
     # Generate a new keystore
     echo "🔐 Generating new keystore..."
     sudo docker run -it -v "/privasea/config:/app/config" privasea/acceleration-node-beta:latest ./node-calc new_keystore
-    check_status "Keystore generation" || continue
+    if [ $? -ne 0 ]; then
+        echo "❌ Error: Keystore generation failed. Retrying..."
+        continue
+    fi
 
     # Rename the keystore file in the /privasea/config folder to wallet_keystore
     echo "📝 Checking for a keystore file starting with 'UTC--' to rename it to 'wallet_keystore'..."
